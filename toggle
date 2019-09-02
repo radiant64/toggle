@@ -1,70 +1,164 @@
 #!/bin/sh
+# Compatibility note: Non-POSIX feature 'local' is used liberally. 
+#
+# Copyright 2019 Martin Evald
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 # vim: filetype=sh
 
-PROGNAME="$0"
+VERSION="1.0.0"
+PROGNAME="$(basename $0)"
+SILENT=""
+
+tgl_log() {
+	[ -z "$SILENT" ] && printf "$*""\n"
+}
 
 tgl_show_usage() {
-	printf "Usage:\n\n"
-	printf "    $PROGNAME [-h] TOGGLE_NAME\n\n"
+	printf "Toggle $VERSION - Tool for toggling availability of files and "
+	printf "filesets.\n\n"
+	printf "Usage:\n"
+	printf "    $PROGNAME [-hls] TOGGLE_GROUP [TOGGLE [TOGGLE ...]]\n"
+	printf "    $PROGNAME [-hls] [PATH [PATH ...]]\n\n"
+	printf "Parameters:\n"
+	printf "    TOGGLE_GROUP    Named group of files to toggle.\n"
+	printf "    TOGGLE          Individual toggle for a file in the group.\n"
+	printf "    PATH            A file in the filesystem.\n"
+	printf "\n"
+	printf "Flags:\n"
+	printf "    -h  Displays this help and exits.\n"
+	printf "    -l  Lists the currently active toggles (disabled files).\n"
+	printf "    -s  Disables most terminal output.\n"
 }
 
 tgl_gethash() {
-	printf "$1"|cksum|cut -d\  -f1
+	printf "$1"|cksum|cut -d\  -f1 -
 }
 
-tgl_generate_config() {
-	mkdir -p "$(dirname "$1")"
-	cat >"$1" <<"EOF"
-prepare-commit-msg '"$(git rev-parse --show-toplevel)"/.git/hooks/prepare-commit-msg'
-EOF
+tgl_exists() {
+	[ -n "$(eval printf "\$$1")" ]
 }
 
 tgl_parse_config() {
-	while read TGLNAME TGLFILE
+	while read TGLTYPE TGLGROUP TGLNAME TGLARGS
 	do
-		eval "TGL$(tgl_gethash $TGLNAME)=$TGLFILE"
+		case $TGLTYPE in
+			toggle) {
+				local TOGGLE=TGL$(tgl_gethash $TGLGROUP:$TGLNAME);
+				local GROUP=TGL$(tgl_gethash $TGLGROUP);
+				eval "$TOGGLE=$TGLARGS";
+				eval "$GROUP=\"\$$GROUP $TGLNAME\"";
+			};;
+		esac
 	done <"$1"
 }
 
+tgl_list_active() {
+	[ -s "$TGL_ACTIVE" ] || {
+		tgl_log "No currently active toggles.";
+		return;
+	}
+	tgl_log "Currently disabled files:\n"
+	while read -r ACTIVE
+	do
+		local NAME="$(printf $ACTIVE|cut -d: -f1 -)"
+		local FILE="$(printf $ACTIVE|cut -d: -f2- -)"
+		printf "$FILE"
+		[ -n "$NAME" ] && printf "\t($NAME)\n" || printf "\n"
+	done <"$TGL_ACTIVE"
+}
+
+tgl_disable() {
+	local FNAME="$1"
+	local TGLNAME="$2"
+	mkdir -p "$TGL_STORAGE/$(dirname "$FNAME")"
+	mv "$FNAME" "$TGL_STORAGE/$FNAME"
+	printf "$TGLNAME:$FNAME\n" >"$TGL_ACTIVE"
+	tgl_log "Disabled $FNAME"
+}
+
+tgl_enable() {
+	local FNAME="$1"
+	mv "$TGL_STORAGE/$FNAME" "$FNAME"
+	sed -i "/$(printf $FNAME|sed -e 's/\//\\\//g')\$/ d" "$TGL_ACTIVE"
+	tgl_log "Enabled $FNAME"
+}
+
 tgl_run() {
-    while getopts h OPT
+    while getopts hls OPT
     do
         case $OPT in
             h) { tgl_show_usage; exit; } ;;
+			l) { tgl_list_active; exit; } ;;
+			s) SILENT="y" ;;
         esac
     done
     shift $(expr $OPTIND - 1)
 
-	if [ $# -ne 1 ]; then tgl_show_usage; exit 1; fi
+	if [ $# -eq 0 ]; then tgl_show_usage; exit 1; fi
 
-	local TGLNAME="$1"
-	local TGLFUNC="$(eval printf \"\$TGL$(tgl_gethash "$TGLNAME")\")"
-	if [ -n "$TGLFUNC" ]
+	local TGLGROUP="$1"
+	tgl_exists "$TGLGROUP" && shift 1
+	local TGLNAMES="$*"
+	local HASNAMES="$TGLNAMES"
+	if [ -z "$TGLNAMES" ]
 	then
-		TGLNAME="$(eval "printf $TGLFUNC")"
+		tgl_exists "$TGLGROUP" && {
+			TGLNAMES="$(eval printf \"\$TGL$(tgl_gethash "$TGLGROUP")\")";
+		} || {
+			tgl_log "Group '$TGLGROUP' doesn't exist, and no files specified!";
+			exit 2;
+		}
 	fi
-	
-	if [ -e "$TGLNAME" ]
-	then
-		mkdir -p "$TGL_STORAGE/$(dirname "$TGLNAME")"
-		mv "$TGLNAME" "$TGL_STORAGE/$TGLNAME"
-		printf "Disabled $TGLNAME\n"
-	elif [ -e "$TGL_STORAGE/$TGLNAME" ] 
-	then
-		mv "$TGL_STORAGE/$TGLNAME" "$TGLNAME"
-		printf "Enabled $TGLNAME\n"
-	else
-		printf "Couldn't toggle file: $TGLNAME\n"
-	fi
+
+	for TGLNAME in $TGLNAMES
+	do
+		local FNAME="$TGLNAME"
+		local TGLFUNC="$(eval\
+			printf \"\$TGL$(tgl_gethash "$TGLGROUP:$TGLNAME")\")"
+		if [ -n "$TGLFUNC" ]
+		then
+			FNAME="$(eval "printf $TGLFUNC")"
+		fi
+		
+		if [ -e "$FNAME" ]
+		then
+			tgl_disable "$FNAME" "$TGLNAME"
+		elif [ -e "$TGL_STORAGE/$FNAME" ] 
+		then
+			tgl_enable "$FNAME"
+		elif [ -n "$HASNAMES" ]
+		then
+			tgl_log "Couldn't toggle file: $FNAME (file not found)"
+		fi
+	done
 }
 
 [ -z "$XDG_CONFIG_HOME" ] && XDG_CONFIG_HOME="$HOME/.config"
 [ -z "$XDG_DATA_HOME" ] && XDG_DATA_HOME="$HOME/.local/share"
 
-TGL_CONFIG="$XDG_CONFIG_HOME/toggle/config" 
-TGL_STORAGE="$XDG_DATA_HOME/toggle"
-[ -f "$TGL_CONFIG" ] || tgl_generate_config "$TGL_CONFIG"
+TGL_CONFIG="$XDG_CONFIG_HOME/toggle" 
+TGL_ACTIVE="$XDG_DATA_HOME/toggle/active"
+TGL_STORAGE="$XDG_DATA_HOME/toggle/repo"
+[ -f "$TGL_CONFIG" ] || mkdir -p "$TGL_CONFIG"
 
-tgl_parse_config "$TGL_CONFIG"
+for CONFIG in "$TGL_CONFIG"/*.config; do tgl_parse_config "$CONFIG"; done
 tgl_run "$@"
 
