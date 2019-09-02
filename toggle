@@ -1,0 +1,70 @@
+#!/bin/sh
+# vim: filetype=sh
+
+PROGNAME="$0"
+
+tgl_show_usage() {
+	printf "Usage:\n\n"
+	printf "    $PROGNAME [-h] TOGGLE_NAME\n\n"
+}
+
+tgl_gethash() {
+	printf "$1"|cksum|cut -d\  -f1
+}
+
+tgl_generate_config() {
+	mkdir -p "$(dirname "$1")"
+	cat >"$1" <<"EOF"
+prepare-commit-msg '"$(git rev-parse --show-toplevel)"/.git/hooks/prepare-commit-msg'
+EOF
+}
+
+tgl_parse_config() {
+	while read TGLNAME TGLFILE
+	do
+		eval "TGL$(tgl_gethash $TGLNAME)=$TGLFILE"
+	done <"$1"
+}
+
+tgl_run() {
+    while getopts h OPT
+    do
+        case $OPT in
+            h) { tgl_show_usage; exit; } ;;
+        esac
+    done
+    shift $(expr $OPTIND - 1)
+
+	if [ $# -ne 1 ]; then tgl_show_usage; exit 1; fi
+
+	local TGLNAME="$1"
+	local TGLFUNC="$(eval printf \"\$TGL$(tgl_gethash "$TGLNAME")\")"
+	if [ -n "$TGLFUNC" ]
+	then
+		TGLNAME="$(eval "printf $TGLFUNC")"
+	fi
+	
+	if [ -e "$TGLNAME" ]
+	then
+		mkdir -p "$TGL_STORAGE/$(dirname "$TGLNAME")"
+		mv "$TGLNAME" "$TGL_STORAGE/$TGLNAME"
+		printf "Disabled $TGLNAME\n"
+	elif [ -e "$TGL_STORAGE/$TGLNAME" ] 
+	then
+		mv "$TGL_STORAGE/$TGLNAME" "$TGLNAME"
+		printf "Enabled $TGLNAME\n"
+	else
+		printf "Couldn't toggle file: $TGLNAME\n"
+	fi
+}
+
+[ -z "$XDG_CONFIG_HOME" ] && XDG_CONFIG_HOME="$HOME/.config"
+[ -z "$XDG_DATA_HOME" ] && XDG_DATA_HOME="$HOME/.local/share"
+
+TGL_CONFIG="$XDG_CONFIG_HOME/toggle/config" 
+TGL_STORAGE="$XDG_DATA_HOME/toggle"
+[ -f "$TGL_CONFIG" ] || tgl_generate_config "$TGL_CONFIG"
+
+tgl_parse_config "$TGL_CONFIG"
+tgl_run "$@"
+
