@@ -1,0 +1,33 @@
+toggle githooks\
+	applypatch-msg\
+		'"$(git rev-parse --show-toplevel)"/.git/hooks/applypatch-msg'
+toggle githooks\
+	commit-msg\
+		'"$(git rev-parse --show-toplevel)"/.git/hooks/commit-msg'
+toggle githooks\
+	fsmonitor-watchman\
+		'"$(git rev-parse --show-toplevel)"/.git/hooks/fsmonitor-watchman'
+toggle githooks\
+	post-update\
+		'"$(git rev-parse --show-toplevel)"/.git/hooks/post-update'
+toggle githooks\
+	pre-applypatch\
+		'"$(git rev-parse --show-toplevel)"/.git/hooks/pre-applypatch'
+toggle githooks\
+	pre-commit\
+		'"$(git rev-parse --show-toplevel)"/.git/hooks/pre-commit'
+toggle githooks\
+	prepare-commit-msg\
+		'"$(git rev-parse --show-toplevel)"/.git/hooks/prepare-commit-msg'
+toggle githooks\
+	pre-push\
+		'"$(git rev-parse --show-toplevel)"/.git/hooks/pre-push'
+toggle githooks\
+	pre-rebase\
+		'"$(git rev-parse --show-toplevel)"/.git/hooks/pre-rebase'
+toggle githooks\
+	pre-receive\
+		'"$(git rev-parse --show-toplevel)"/.git/hooks/pre-receive'
+toggle githooks\
+	update\
+		'"$(git rev-parse --show-toplevel)"/.git/hooks/update'
