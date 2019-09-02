@@ -23,7 +23,7 @@
 
 # vim: filetype=sh
 
-VERSION="1.0.0"
+VERSION="1.0.1"
 PROGNAME="$(basename $0)"
 SILENT=""
 
@@ -115,12 +115,12 @@ tgl_run() {
 	if [ $# -eq 0 ]; then tgl_show_usage; exit 1; fi
 
 	local TGLGROUP="$1"
-	tgl_exists "$TGLGROUP" && shift 1
+	tgl_exists "TGL$(tgl_gethash "$TGLGROUP")" && shift 1
 	local TGLNAMES="$*"
 	local HASNAMES="$TGLNAMES"
 	if [ -z "$TGLNAMES" ]
 	then
-		tgl_exists "$TGLGROUP" && {
+		tgl_exists "TGL$(tgl_gethash "$TGLGROUP")" && {
 			TGLNAMES="$(eval printf \"\$TGL$(tgl_gethash "$TGLGROUP")\")";
 		} || {
 			tgl_log "Group '$TGLGROUP' doesn't exist, and no files specified!";
