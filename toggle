@@ -28,77 +28,77 @@ PROGNAME="$(basename $0)"
 SILENT=""
 
 tgl_log() {
-	[ -z "$SILENT" ] && printf "$*""\n"
+    [ -z "$SILENT" ] && printf "$*""\n"
 }
 
 tgl_show_usage() {
-	printf "Toggle $VERSION - Tool for toggling availability of files and "
-	printf "filesets.\n\n"
-	printf "Usage:\n"
-	printf "    $PROGNAME [-hls] TOGGLE_GROUP [TOGGLE [TOGGLE ...]]\n"
-	printf "    $PROGNAME [-hls] [PATH [PATH ...]]\n\n"
-	printf "Parameters:\n"
-	printf "    TOGGLE_GROUP    Named group of files to toggle.\n"
-	printf "    TOGGLE          Individual toggle for a file in the group.\n"
-	printf "    PATH            A file in the filesystem.\n"
-	printf "\n"
-	printf "Flags:\n"
-	printf "    -h  Displays this help and exits.\n"
-	printf "    -l  Lists the currently active toggles (disabled files).\n"
-	printf "    -s  Disables most terminal output.\n"
+    printf "Toggle $VERSION - Tool for toggling availability of files and "
+    printf "filesets.\n\n"
+    printf "Usage:\n"
+    printf "    $PROGNAME [-hls] TOGGLE_GROUP [TOGGLE [TOGGLE ...]]\n"
+    printf "    $PROGNAME [-hls] [PATH [PATH ...]]\n\n"
+    printf "Parameters:\n"
+    printf "    TOGGLE_GROUP    Named group of files to toggle.\n"
+    printf "    TOGGLE          Individual toggle for a file in the group.\n"
+    printf "    PATH            A file in the filesystem.\n"
+    printf "\n"
+    printf "Flags:\n"
+    printf "    -h  Displays this help and exits.\n"
+    printf "    -l  Lists the currently active toggles (disabled files).\n"
+    printf "    -s  Disables most terminal output.\n"
 }
 
 tgl_gethash() {
-	printf "$1"|cksum|cut -d\  -f1 -
+    printf "$1"|cksum|cut -d\  -f1 -
 }
 
 tgl_exists() {
-	[ -n "$(eval printf "\$$1")" ]
+    [ -n "$(eval printf "\$$1")" ]
 }
 
 tgl_parse_config() {
-	while read TGLTYPE TGLGROUP TGLNAME TGLARGS
-	do
-		case $TGLTYPE in
-			toggle) {
-				local TOGGLE=TGL$(tgl_gethash $TGLGROUP:$TGLNAME);
-				local GROUP=TGL$(tgl_gethash $TGLGROUP);
-				eval "$TOGGLE=$TGLARGS";
-				eval "$GROUP=\"\$$GROUP $TGLNAME\"";
-			};;
-		esac
-	done <"$1"
+    while read TGLTYPE TGLGROUP TGLNAME TGLARGS
+    do
+        case $TGLTYPE in
+            toggle) {
+                local TOGGLE=TGL$(tgl_gethash $TGLGROUP:$TGLNAME);
+                local GROUP=TGL$(tgl_gethash $TGLGROUP);
+                eval "$TOGGLE=$TGLARGS";
+                eval "$GROUP=\"\$$GROUP $TGLNAME\"";
+            };;
+        esac
+    done <"$1"
 }
 
 tgl_list_active() {
-	[ -s "$TGL_ACTIVE" ] || {
-		tgl_log "No currently active toggles.";
-		return;
-	}
-	tgl_log "Currently disabled files:\n"
-	while read -r ACTIVE
-	do
-		local NAME="$(printf $ACTIVE|cut -d: -f1 -)"
-		local FILE="$(printf $ACTIVE|cut -d: -f2- -)"
-		printf "$FILE"
-		[ -n "$NAME" ] && printf "\t($NAME)\n" || printf "\n"
-	done <"$TGL_ACTIVE"
+    [ -s "$TGL_ACTIVE" ] || {
+        tgl_log "No currently active toggles.";
+        return;
+    }
+    tgl_log "Currently disabled files:\n"
+    while read -r ACTIVE
+    do
+        local NAME="$(printf $ACTIVE|cut -d: -f1 -)"
+        local FILE="$(printf $ACTIVE|cut -d: -f2- -)"
+        printf "$FILE"
+        [ -n "$NAME" ] && printf "\t($NAME)\n" || printf "\n"
+    done <"$TGL_ACTIVE"
 }
 
 tgl_disable() {
-	local FNAME="$1"
-	local TGLNAME="$2"
-	mkdir -p "$TGL_STORAGE/$(dirname "$FNAME")"
-	mv "$FNAME" "$TGL_STORAGE/$FNAME"
-	printf "$TGLNAME:$FNAME\n" >"$TGL_ACTIVE"
-	tgl_log "Disabled $FNAME"
+    local FNAME="$1"
+    local TGLNAME="$2"
+    mkdir -p "$TGL_STORAGE/$(dirname "$FNAME")"
+    mv "$FNAME" "$TGL_STORAGE/$FNAME"
+    printf "$TGLNAME:$FNAME\n" >"$TGL_ACTIVE"
+    tgl_log "Disabled $FNAME"
 }
 
 tgl_enable() {
-	local FNAME="$1"
-	mv "$TGL_STORAGE/$FNAME" "$FNAME"
-	sed -i "/$(printf $FNAME|sed -e 's/\//\\\//g')\$/ d" "$TGL_ACTIVE"
-	tgl_log "Enabled $FNAME"
+    local FNAME="$1"
+    mv "$TGL_STORAGE/$FNAME" "$FNAME"
+    sed -i "/$(printf $FNAME|sed -e 's/\//\\\//g')\$/ d" "$TGL_ACTIVE"
+    tgl_log "Enabled $FNAME"
 }
 
 tgl_run() {
@@ -106,49 +106,49 @@ tgl_run() {
     do
         case $OPT in
             h) { tgl_show_usage; exit; } ;;
-			l) { tgl_list_active; exit; } ;;
-			s) SILENT="y" ;;
+            l) { tgl_list_active; exit; } ;;
+            s) SILENT="y" ;;
         esac
     done
     shift $(expr $OPTIND - 1)
 
-	if [ $# -eq 0 ]; then tgl_show_usage; exit 1; fi
+    if [ $# -eq 0 ]; then tgl_show_usage; exit 1; fi
 
-	local TGLGROUP="$1"
-	tgl_exists "TGL$(tgl_gethash "$TGLGROUP")" && shift 1
-	local TGLNAMES="$*"
-	local HASNAMES="$TGLNAMES"
-	if [ -z "$TGLNAMES" ]
-	then
-		tgl_exists "TGL$(tgl_gethash "$TGLGROUP")" && {
-			TGLNAMES="$(eval printf \"\$TGL$(tgl_gethash "$TGLGROUP")\")";
-		} || {
-			tgl_log "Group '$TGLGROUP' doesn't exist, and no files specified!";
-			exit 2;
-		}
-	fi
+    local TGLGROUP="$1"
+    tgl_exists "TGL$(tgl_gethash "$TGLGROUP")" && shift 1
+    local TGLNAMES="$*"
+    local HASNAMES="$TGLNAMES"
+    if [ -z "$TGLNAMES" ]
+    then
+        tgl_exists "TGL$(tgl_gethash "$TGLGROUP")" && {
+            TGLNAMES="$(eval printf \"\$TGL$(tgl_gethash "$TGLGROUP")\")";
+        } || {
+            tgl_log "Group '$TGLGROUP' doesn't exist, and no files specified!";
+            exit 2;
+        }
+    fi
 
-	for TGLNAME in $TGLNAMES
-	do
-		local FNAME="$TGLNAME"
-		local TGLFUNC="$(eval\
-			printf \"\$TGL$(tgl_gethash "$TGLGROUP:$TGLNAME")\")"
-		if [ -n "$TGLFUNC" ]
-		then
-			FNAME="$(eval "printf $TGLFUNC")"
-		fi
-		
-		if [ -e "$FNAME" ]
-		then
-			tgl_disable "$FNAME" "$TGLNAME"
-		elif [ -e "$TGL_STORAGE/$FNAME" ] 
-		then
-			tgl_enable "$FNAME"
-		elif [ -n "$HASNAMES" ]
-		then
-			tgl_log "Couldn't toggle file: $FNAME (file not found)"
-		fi
-	done
+    for TGLNAME in $TGLNAMES
+    do
+        local FNAME="$TGLNAME"
+        local TGLFUNC="$(eval\
+            printf \"\$TGL$(tgl_gethash "$TGLGROUP:$TGLNAME")\")"
+        if [ -n "$TGLFUNC" ]
+        then
+            FNAME="$(eval "printf $TGLFUNC")"
+        fi
+
+        if [ -e "$FNAME" ]
+        then
+            tgl_disable "$FNAME" "$TGLNAME"
+        elif [ -e "$TGL_STORAGE/$FNAME" ] 
+        then
+            tgl_enable "$FNAME"
+        elif [ -n "$HASNAMES" ]
+        then
+            tgl_log "Couldn't toggle file: $FNAME (file not found)"
+        fi
+    done
 }
 
 [ -z "$XDG_CONFIG_HOME" ] && XDG_CONFIG_HOME="$HOME/.config"
