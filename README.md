@@ -17,7 +17,11 @@ again by reissuing the command on the same path or set of paths. In addition, it
 is possible to specify grouped sets of automatic rules for path generation.
 
 Rules are specified in config files, residing in the `$XDG_CONFIG_HOME/toggle/`
-directory. See the example files for usage.
+directory. See the example files for usage. Toggled files are stored in
+`$XDG_DATA_HOME/toggle/repo`, and a list of active toggles is kept in
+`$XDG_DATA_HOME/toggle/active`.
+
+Active toggles (currently hidden files) can be listed using `toggle -l`.
 
 `toggle -h` will provide more detailed information about flags and parameters.
 
