@@ -92,17 +92,21 @@ tgl_list_active() {
 tgl_disable() {
     local FNAME="$1"
     local TGLNAME="$2"
-    mkdir -p "$TGL_STORAGE/$(dirname "$FNAME")"
-    mv "$FNAME" "$TGL_STORAGE/$FNAME"
-    printf "$TGLNAME:$FNAME\n" >>"$TGL_ACTIVE"
-    tgl_log "Disabled $FNAME"
+    mkdir -p "$TGL_STORAGE/$(dirname "$FNAME")"\
+    && mv "$FNAME" "$TGL_STORAGE/$FNAME"\
+    && printf "$TGLNAME:$FNAME\n" >>"$TGL_ACTIVE"\
+    && tgl_log "Disabled $FNAME"\
+    || tgl_log "Error when disabling $FNAME, recommend checking state in \
+$TGL_STORAGE"
 }
 
 tgl_enable() {
     local FNAME="$1"
-    mv "$TGL_STORAGE/$FNAME" "$FNAME"
-    sed -i "/$(printf $FNAME|sed -e 's/\//\\\//g')\$/ d" "$TGL_ACTIVE"
-    tgl_log "Enabled $FNAME"
+    mv -n "$TGL_STORAGE/$FNAME" "$FNAME"\
+    && sed -i "/$(printf $FNAME|sed -e 's/\//\\\//g')\$/ d" "$TGL_ACTIVE"\
+    && tgl_log "Enabled $FNAME"\
+    || tgl_log "Error when enabling toggle $FNAME, recommend checking state in \
+$TGL_STORAGE"
 }
 
 tgl_run() {
