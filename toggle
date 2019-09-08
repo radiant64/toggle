@@ -56,6 +56,10 @@ tgl_exists() {
     [ -n "$(eval printf \"\$$1\")" ]
 }
 
+tgl_full_path() {
+    (cd $(dirname $1); printf $PWD/$(basename "$1"))
+}
+
 tgl_parse_config() {
     while read TGLTYPE TGLGROUP TGLNAME TGLARGS
     do
@@ -137,6 +141,7 @@ tgl_run() {
         then
             FNAME="$(eval "printf $TGLFUNC")"
         fi
+        FNAME=$(tgl_full_path "$FNAME")
 
         if [ -e "$FNAME" ]
         then
