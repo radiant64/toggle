@@ -44,7 +44,3 @@ Currently disabled files:
 Enabled /home/dave/dev/project/.git/hooks/update
 ```
 
-## License
-
-MIT
-
